@@ -40,7 +40,7 @@ jobs:
       - name: Assemble standalone bundle
         run: |
           cp -r .next/static .next/standalone/.next/static
-          cp -r public .next/standalone/public
+          [ -d public ] && cp -r public .next/standalone/public || echo "No public/ dir, skipping"
 
       - name: Transfer standalone bundle to server
         uses: appleboy/scp-action@v0.1.7

@@ -12,7 +12,6 @@ jobs:
   deploy:
     name: Deploy to 10.0.40.71 (CT 108)
     runs-on: ubuntu-latest
-    environment: production
 
     steps:
       - name: Checkout code

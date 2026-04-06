@@ -28,38 +28,27 @@ export function DashboardCharts() {
 
   const isFleet = area === "fleet"
 
+  if (isFleet) return null
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">
-            {isFleet ? "Ticket-Verlauf (30 Tage)" : "Ticket-Verlauf (30 Tage)"}
-          </CardTitle>
+          <CardTitle className="text-sm font-semibold">Ticket-Verlauf (30 Tage)</CardTitle>
         </CardHeader>
         <CardContent>
           <TicketTrendChart />
         </CardContent>
       </Card>
 
-      {isFleet ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Fahrzeugauslastung</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <VehicleUtilizationChart />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Meldungen nach Kategorie</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TicketCategoryChart />
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">Meldungen nach Kategorie</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TicketCategoryChart />
+        </CardContent>
+      </Card>
     </div>
   )
 }

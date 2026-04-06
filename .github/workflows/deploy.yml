@@ -41,7 +41,8 @@ jobs:
       - name: Deploy to /var/www/company-portal
         run: |
           APP_DIR=/var/www/company-portal
-          mkdir -p "$APP_DIR"
+          sudo mkdir -p "$APP_DIR"
+          sudo chown -R "$(whoami):" "$APP_DIR"
 
           # Sync standalone bundle (built on this runner = this server)
           rsync -a --delete .next/standalone/ "$APP_DIR/"

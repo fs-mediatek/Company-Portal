@@ -39,6 +39,8 @@ jobs:
           [ -d public ] && cp -r public .next/standalone/public || echo "No public/ dir, skipping"
 
       - name: Deploy to /var/www/company-portal
+        env:
+          PATH: /usr/local/bin:/usr/bin:/bin
         run: |
           APP_DIR=/var/www/company-portal
           mkdir -p "$APP_DIR"
@@ -64,6 +66,8 @@ jobs:
           bash "$APP_DIR/scripts/deploy.sh"
 
       - name: Verify deployment
+        env:
+          PATH: /usr/local/bin:/usr/bin:/bin
         run: |
           pm2 status company-portal
           curl -sf http://localhost:3000/ > /dev/null && echo "Health check: OK" || echo "Health check: FAILED"

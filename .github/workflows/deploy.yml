@@ -43,8 +43,11 @@ jobs:
           APP_DIR=/var/www/company-portal
           mkdir -p "$APP_DIR"
 
-          # Sync standalone bundle (built on this runner = this server)
-          rsync -a --delete .next/standalone/ "$APP_DIR/"
+          # Sync standalone bundle — exclude server-side config files from deletion
+          rsync -a --delete \
+            --exclude='.env.local' \
+            --exclude='.env' \
+            .next/standalone/ "$APP_DIR/"
 
           # Keep ecosystem config and scripts up to date
           cp ecosystem.config.cjs "$APP_DIR/ecosystem.config.cjs"

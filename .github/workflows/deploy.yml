@@ -46,7 +46,8 @@ jobs:
           mkdir -p "$APP_DIR"
 
           echo "[diag] whoami: $(whoami)"
-          echo "[diag] ls /var/www/: $(ls /var/www/ 2>&1)"
+          echo "[diag] pm2 location: $(find /usr /root /home -name pm2 -type f 2>/dev/null | head -3)"
+          echo "[diag] PATH: $PATH"
           echo "[diag] .env.local before rsync: $(ls -la $APP_DIR/.env.local 2>&1)"
 
           # Sync standalone bundle — exclude server-side config files from deletion
@@ -61,6 +62,15 @@ jobs:
           cp ecosystem.config.cjs "$APP_DIR/ecosystem.config.cjs"
           cp -r scripts "$APP_DIR/scripts"
           chmod +x "$APP_DIR/scripts/"*.sh
+
+          # Ensure pm2 is on PATH regardless of install location
+          PM2_BIN=$(find /usr /root /home -name pm2 -type f 2>/dev/null | head -1)
+          if [ -n "$PM2_BIN" ]; then
+            export PATH="$(dirname "$PM2_BIN"):$PATH"
+            echo "[diag] pm2 found at: $PM2_BIN"
+          else
+            echo "[diag] WARNING: pm2 not found on filesystem"
+          fi
 
           # Reload or start PM2
           bash "$APP_DIR/scripts/deploy.sh"

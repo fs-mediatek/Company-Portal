@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getSession } from "@/lib/auth"
-import { query, queryOne } from "@/lib/db"
+import { getSessionFromRequest } from "@/lib/auth"
+import { coreQuery, coreQueryOne } from "@/lib/core-db"
 import bcrypt from "bcryptjs"
 
 type Ctx = { params: Promise<{ id: string }> }
 
 export async function GET(req: NextRequest, { params }: Ctx) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSessionFromRequest(req)
+  if (!session) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 })
 
   const { id } = await params
-  const user = await queryOne(
-    `SELECT u.id, u.name, u.email, u.role, u.group_id, u.phone, u.active, u.created_at,
-            g.name as group_name
-     FROM users u LEFT JOIN \`groups\` g ON u.group_id = g.id
+  const user = await coreQueryOne(
+    `SELECT u.id, u.name, u.email, u.role, u.department_id, u.phone, u.active, u.created_at,
+            d.display_name as department_name
+     FROM users u LEFT JOIN departments d ON u.department_id = d.id
      WHERE u.id = ?`,
     [id]
   )
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
 }
 
 export async function PUT(req: NextRequest, { params }: Ctx) {
-  const session = await getSession()
+  const session = await getSessionFromRequest(req)
   if (!session || !session.role.includes("admin")) {
     return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 })
   }
@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   if (body.name !== undefined) { updates.push("name = ?"); vals.push(body.name) }
   if (body.email !== undefined) { updates.push("email = ?"); vals.push(body.email) }
   if (body.role !== undefined) { updates.push("role = ?"); vals.push(body.role) }
-  if (body.group_id !== undefined) { updates.push("group_id = ?"); vals.push(body.group_id || null) }
+  if (body.department_id !== undefined) { updates.push("department_id = ?"); vals.push(body.department_id || null) }
   if (body.phone !== undefined) { updates.push("phone = ?"); vals.push(body.phone || null) }
   if (body.active !== undefined) { updates.push("active = ?"); vals.push(body.active ? 1 : 0) }
   if (body.password) {
@@ -47,23 +47,21 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   if (!updates.length) return NextResponse.json({ error: "Keine Felder" }, { status: 400 })
 
-  await query(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, [...vals, id])
+  await coreQuery(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, [...vals, id])
   return NextResponse.json({ success: true })
 }
 
 export async function DELETE(req: NextRequest, { params }: Ctx) {
-  const session = await getSession()
+  const session = await getSessionFromRequest(req)
   if (!session || !session.role.includes("admin")) {
     return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 })
   }
 
   const { id } = await params
-
-  // Don't allow deleting yourself
   if (parseInt(id) === session.userId) {
     return NextResponse.json({ error: "Eigenes Konto kann nicht deaktiviert werden" }, { status: 400 })
   }
 
-  await query('UPDATE users SET active = 0 WHERE id = ?', [id])
+  await coreQuery("UPDATE users SET active = 0 WHERE id = ?", [id])
   return NextResponse.json({ success: true })
 }

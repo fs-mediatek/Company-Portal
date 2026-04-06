@@ -1,0 +1,37 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_NAME=facility_mgmt
+      - DB_USER=facility
+      - DB_PASSWORD=facility_secret_2026
+      - APP_SECRET_KEY=fac-mgmt-secret-key-prod-2026-x7k9
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mariadb:11
+    environment:
+      - MYSQL_ROOT_PASSWORD=facility_root_2026
+      - MYSQL_DATABASE=facility_mgmt
+      - MYSQL_USER=facility
+      - MYSQL_PASSWORD=facility_secret_2026
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db_data:

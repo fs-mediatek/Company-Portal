@@ -1,29 +1,22 @@
 "use client"
-import { useState, useEffect, useRef } from "react"
-import { AreaTransition } from "./area-transition"
+import { useState } from "react"
+import { Sidebar } from "./sidebar"
+import { Topbar } from "./topbar"
+import { Chatbot } from "@/components/chat/chatbot"
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  const [transitionArea, setTransitionArea] = useState<"facility" | "fleet" | null>(null)
-  const keyRef = useRef(0)
-
-  useEffect(() => {
-    function handleSwitch(e: Event) {
-      const area = (e as CustomEvent).detail as "facility" | "fleet"
-      keyRef.current++
-      setTransitionArea(area)
-    }
-    window.addEventListener("area-switch", handleSwitch)
-    return () => window.removeEventListener("area-switch", handleSwitch)
-  }, [])
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <>
-      {children}
-      <AreaTransition
-        key={keyRef.current}
-        area={transitionArea}
-        onDone={() => setTransitionArea(null)}
-      />
-    </>
+    <div className="flex h-screen overflow-hidden bg-background">
+      <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <Topbar onMenuToggle={() => setMobileOpen(!mobileOpen)} />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          {children}
+        </main>
+      </div>
+      <Chatbot />
+    </div>
   )
 }

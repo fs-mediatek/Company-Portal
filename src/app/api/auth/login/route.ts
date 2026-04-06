@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { query } from "@/lib/db"
+import { coreQuery } from "@/lib/core-db"
 import { signToken } from "@/lib/auth"
 import bcrypt from "bcryptjs"
 
@@ -11,8 +11,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "E-Mail und Passwort erforderlich" }, { status: 400 })
     }
 
-    const user = await query(
-      'SELECT id, name, email, password_hash, role, active FROM users WHERE email = ?',
+    const user = await coreQuery(
+      "SELECT id, name, email, password_hash, role, active FROM users WHERE email = ?",
       [email]
     ) as any[]
 
@@ -33,16 +33,16 @@ export async function POST(req: NextRequest) {
       userId: user[0].id,
       email: user[0].email,
       name: user[0].name,
-      role: user[0].role || 'melder',
+      role: user[0].role || "user",
     })
 
     const res = NextResponse.json({ success: true, name: user[0].name })
-    res.cookies.set('token', token, {
+    res.cookies.set("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: false,
+      sameSite: "lax",
       maxAge: 60 * 60 * 24,
-      path: '/',
+      path: "/",
     })
     return res
   } catch (err: any) {

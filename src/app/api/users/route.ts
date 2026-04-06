@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getSession } from "@/lib/auth"
-import { query, insert } from "@/lib/db"
+import { getSessionFromRequest } from "@/lib/auth"
+import { coreQuery, coreInsert } from "@/lib/core-db"
 import bcrypt from "bcryptjs"
 
 export async function GET(req: NextRequest) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSessionFromRequest(req)
+  if (!session) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 })
 
-  const isAdmin = session.role.includes("admin")
-  const isManager = session.role.includes("manager")
-  if (!isAdmin && !isManager) {
-    return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 })
-  }
+  const isPrivileged = session.role.includes("admin") || session.role.includes("manager") || session.role.includes("agent")
+  if (!isPrivileged) return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 })
 
-  const { searchParams } = new URL(req.url)
-  const search = searchParams.get("search") || ""
-  const page = parseInt(searchParams.get("page") || "1")
-  const limit = parseInt(searchParams.get("limit") || "50")
+  const sp = req.nextUrl.searchParams
+  const search = sp.get("search") || ""
+  const page = parseInt(sp.get("page") || "1")
+  const limit = parseInt(sp.get("limit") || "50")
   const offset = (page - 1) * limit
 
   let where = "WHERE 1=1"
@@ -27,54 +24,40 @@ export async function GET(req: NextRequest) {
     params.push(`%${search}%`, `%${search}%`)
   }
 
-  // Managers only see users in their own group
-  if (!isAdmin && isManager) {
-    const me = await query<any>('SELECT group_id FROM users WHERE id = ?', [session.userId])
-    if (me[0]?.group_id) {
-      where += " AND u.group_id = ?"
-      params.push(me[0].group_id)
-    }
-  }
-
-  const users = await query(
-    `SELECT u.id, u.name, u.email, u.role, u.group_id, u.phone, u.active, u.created_at,
-            g.name as group_name
+  const users = await coreQuery(
+    `SELECT u.id, u.name, u.email, u.role, u.department_id, u.phone, u.active, u.created_at,
+            d.display_name as department_name
      FROM users u
-     LEFT JOIN \`groups\` g ON u.group_id = g.id
+     LEFT JOIN departments d ON u.department_id = d.id
      ${where}
      ORDER BY u.name ASC
      LIMIT ${limit} OFFSET ${offset}`,
     params
   )
 
-  const [countResult] = await query(`SELECT COUNT(*) as total FROM users u ${where}`, params) as any[]
+  const [countResult] = await coreQuery(`SELECT COUNT(*) as total FROM users u ${where}`, params) as any[]
 
   return NextResponse.json({ users, total: countResult.total, page, limit })
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSessionFromRequest(req)
+  if (!session) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 })
+  if (!session.role.includes("admin")) return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 })
 
-  const isAdmin = session.role.includes("admin")
-  if (!isAdmin) return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 })
-
-  const { name, email, password, role, group_id, phone } = await req.json()
+  const { name, email, password, role, department_id, phone } = await req.json()
 
   if (!name || !email || !password) {
     return NextResponse.json({ error: "Name, E-Mail und Passwort erforderlich" }, { status: 400 })
   }
 
-  // Check duplicate
-  const existing = await query('SELECT id FROM users WHERE email = ?', [email])
-  if (existing.length) {
-    return NextResponse.json({ error: "E-Mail bereits vergeben" }, { status: 400 })
-  }
+  const existing = await coreQuery("SELECT id FROM users WHERE email = ?", [email])
+  if (existing.length) return NextResponse.json({ error: "E-Mail bereits vergeben" }, { status: 400 })
 
   const hash = await bcrypt.hash(password, 12)
-  const id = await insert(
-    'INSERT INTO users (name, email, password_hash, role, group_id, phone) VALUES (?, ?, ?, ?, ?, ?)',
-    [name, email, hash, role || 'melder', group_id || null, phone || null]
+  const id = await coreInsert(
+    "INSERT INTO users (name, email, password_hash, role, department_id, phone) VALUES (?, ?, ?, ?, ?, ?)",
+    [name, email, hash, role || "user", department_id || null, phone || null]
   )
 
   return NextResponse.json({ id }, { status: 201 })

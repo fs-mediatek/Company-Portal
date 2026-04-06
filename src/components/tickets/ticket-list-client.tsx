@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Loader2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Search, Loader2, AlertCircle, ChevronLeft, ChevronRight, LayoutList, Columns3 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { de } from "date-fns/locale"
 import { TicketCreateDialog } from "./ticket-create-dialog"
+import { TicketKanban } from "./ticket-kanban"
+import { cn } from "@/lib/utils"
 
 const statusConfig: Record<string, { label: string; variant: any }> = {
   open: { label: "Offen", variant: "info" },
@@ -27,6 +29,8 @@ const priorityConfig: Record<string, { label: string; variant: any }> = {
   critical: { label: "Kritisch", variant: "destructive" },
 }
 
+type ViewMode = "table" | "kanban"
+
 export function TicketListClient() {
   const [tickets, setTickets] = useState<any[]>([])
   const [total, setTotal] = useState(0)
@@ -36,7 +40,18 @@ export function TicketListClient() {
   const [statusFilter, setStatusFilter] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("")
   const [showCreate, setShowCreate] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("ticket_view") as ViewMode) || "table"
+    }
+    return "table"
+  })
   const limit = 25
+
+  function switchView(mode: ViewMode) {
+    setViewMode(mode)
+    localStorage.setItem("ticket_view", mode)
+  }
 
   async function fetchTickets() {
     setLoading(true)
@@ -54,7 +69,9 @@ export function TicketListClient() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchTickets() }, [page, search, statusFilter, priorityFilter])
+  useEffect(() => {
+    if (viewMode === "table") fetchTickets()
+  }, [page, search, statusFilter, priorityFilter, viewMode])
 
   const totalPages = Math.ceil(total / limit)
 
@@ -65,9 +82,40 @@ export function TicketListClient() {
           <h1 className="text-2xl font-bold">Störungsmeldungen</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Meldungen erstellen und verfolgen</p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4" /> Neue Meldung
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="flex rounded-lg bg-muted p-0.5">
+            <button
+              onClick={() => switchView("table")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors duration-150",
+                viewMode === "table"
+                  ? "bg-card shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title="Tabellenansicht"
+            >
+              <LayoutList className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Tabelle</span>
+            </button>
+            <button
+              onClick={() => switchView("kanban")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors duration-150",
+                viewMode === "kanban"
+                  ? "bg-card shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title="Kanban-Board"
+            >
+              <Columns3 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Kanban</span>
+            </button>
+          </div>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4" /> Neue Meldung
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -76,15 +124,17 @@ export function TicketListClient() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Suchen..." className="pl-9 w-64" value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
         </div>
-        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v === "all" ? "" : v); setPage(1) }}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Alle Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle Status</SelectItem>
-            {Object.entries(statusConfig).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {viewMode === "table" && (
+          <Select value={statusFilter} onValueChange={v => { setStatusFilter(v === "all" ? "" : v); setPage(1) }}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Alle Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Status</SelectItem>
+              {Object.entries(statusConfig).map(([k, v]) => (
+                <SelectItem key={k} value={k}>{v.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={priorityFilter} onValueChange={v => { setPriorityFilter(v === "all" ? "" : v); setPage(1) }}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Alle Prioritäten" /></SelectTrigger>
           <SelectContent>
@@ -96,77 +146,85 @@ export function TicketListClient() {
         </Select>
       </div>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : tickets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <AlertCircle className="h-8 w-8 mb-2 opacity-40" />
-              <p className="text-sm">Keine Meldungen gefunden</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Meldung</TableHead>
-                  <TableHead>Kategorie</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priorität</TableHead>
-                  <TableHead>Melder</TableHead>
-                  <TableHead>Zugewiesen</TableHead>
-                  <TableHead>Erstellt</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tickets.map(t => {
-                  const sc = statusConfig[t.status] || { label: t.status, variant: "secondary" }
-                  const pc = priorityConfig[t.priority] || { label: t.priority, variant: "secondary" }
-                  return (
-                    <TableRow key={t.id} className="cursor-pointer">
-                      <TableCell>
-                        <Link href={`/tickets/${t.id}`} className="block hover:text-primary transition-colors">
-                          <span className="text-xs font-mono text-muted-foreground block">{t.ticket_number}</span>
-                          <span className="font-medium">{t.title}</span>
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.category}</TableCell>
-                      <TableCell><Badge variant={sc.variant}>{sc.label}</Badge></TableCell>
-                      <TableCell><Badge variant={pc.variant}>{pc.label}</Badge></TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.requester_name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.assignee_name || "–"}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(t.created_at), { locale: de, addSuffix: true })}
-                      </TableCell>
+      {/* Content */}
+      {viewMode === "kanban" ? (
+        <TicketKanban search={search} priorityFilter={priorityFilter} />
+      ) : (
+        <>
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : tickets.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 mb-2 opacity-40" />
+                  <p className="text-sm">Keine Meldungen gefunden</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Meldung</TableHead>
+                      <TableHead>Kategorie</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Priorität</TableHead>
+                      <TableHead>Melder</TableHead>
+                      <TableHead>Zugewiesen</TableHead>
+                      <TableHead>Erstellt</TableHead>
                     </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {tickets.map(t => {
+                      const sc = statusConfig[t.status] || { label: t.status, variant: "secondary" }
+                      const pc = priorityConfig[t.priority] || { label: t.priority, variant: "secondary" }
+                      return (
+                        <TableRow key={t.id} className="cursor-pointer">
+                          <TableCell>
+                            <Link href={`/tickets/${t.id}`} className="block hover:text-primary transition-colors">
+                              <span className="text-xs font-mono text-muted-foreground block">{t.ticket_number}</span>
+                              <span className="font-medium">{t.title}</span>
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{t.category}</TableCell>
+                          <TableCell><Badge variant={sc.variant}>{sc.label}</Badge></TableCell>
+                          <TableCell><Badge variant={pc.variant}>{pc.label}</Badge></TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{t.requester_name}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{t.assignee_name || "–"}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDistanceToNow(new Date(t.created_at), { locale: de, addSuffix: true })}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">{total} Meldungen gesamt</p>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm">Seite {page} von {totalPages}</span>
-            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">{total} Meldungen gesamt</p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm">Seite {page} von {totalPages}</span>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      <TicketCreateDialog open={showCreate} onOpenChange={setShowCreate} onCreated={fetchTickets} />
+      <TicketCreateDialog open={showCreate} onOpenChange={setShowCreate} onCreated={() => {
+        if (viewMode === "table") fetchTickets()
+      }} />
     </div>
   )
 }

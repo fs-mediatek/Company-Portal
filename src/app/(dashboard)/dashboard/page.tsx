@@ -1,8 +1,11 @@
 import { getSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { query } from "@/lib/db"
+import { coreQuery } from "@/lib/core-db"
 import Link from "next/link"
 import { AlertTriangle, Clock, CheckCircle2, Users, ArrowRight } from "lucide-react"
+import { DashboardCharts } from "@/components/dashboard/dashboard-client"
+import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 
 export default async function DashboardPage() {
   const session = await getSession()
@@ -13,7 +16,6 @@ export default async function DashboardPage() {
   const isTechniker = session.role.includes("techniker") || session.role.includes("hausmeister")
   const isPrivileged = isAdmin || isManager
 
-  // Build where clause based on role
   let ticketWhere = ""
   const ticketParams: any[] = []
   if (!isPrivileged) {
@@ -26,7 +28,6 @@ export default async function DashboardPage() {
     }
   }
 
-  // Stats
   const [openCount] = await query<any>(
     `SELECT COUNT(*) as c FROM tickets t WHERE status = 'open' ${ticketWhere}`, ticketParams
   )
@@ -37,25 +38,24 @@ export default async function DashboardPage() {
     `SELECT COUNT(*) as c FROM tickets t WHERE status = 'resolved' AND DATE(resolved_at) = CURDATE() ${ticketWhere}`, ticketParams
   )
 
-  let fourthStat: { label: string; value: number; icon: any; color: string }
+  let fourthStat: { label: string; value: number; iconKey: string }
   if (isPrivileged) {
-    const [userCount] = await query<any>('SELECT COUNT(*) as c FROM users WHERE active = 1')
-    fourthStat = { label: "Aktive Benutzer", value: userCount.c, icon: Users, color: "bg-blue-500/10 text-blue-600" }
+    const [userCount] = await coreQuery<any>('SELECT COUNT(*) as c FROM users WHERE active = 1')
+    fourthStat = { label: "Aktive Benutzer", value: userCount.c, iconKey: "users" }
   } else {
     const [myCount] = await query<any>(
       'SELECT COUNT(*) as c FROM tickets WHERE requester_id = ?', [session.userId]
     )
-    fourthStat = { label: "Meine Meldungen", value: myCount.c, icon: AlertTriangle, color: "bg-purple-500/10 text-purple-600" }
+    fourthStat = { label: "Meine Meldungen", value: myCount.c, iconKey: "alert" }
   }
 
   const stats = [
-    { label: "Offene Meldungen", value: openCount.c, icon: AlertTriangle, color: "bg-amber-500/10 text-amber-600" },
-    { label: "In Bearbeitung", value: inProgressCount.c, icon: Clock, color: "bg-primary/10 text-primary" },
-    { label: "Heute gelöst", value: resolvedTodayCount.c, icon: CheckCircle2, color: "bg-emerald-500/10 text-emerald-600" },
+    { label: "Offene Meldungen", value: openCount.c, iconKey: "alert" },
+    { label: "In Bearbeitung", value: inProgressCount.c, iconKey: "clock" },
+    { label: "Heute gelöst", value: resolvedTodayCount.c, iconKey: "check" },
     fourthStat,
   ]
 
-  // Recent tickets
   const recentTickets = await query<any>(
     `SELECT t.*, u.name as requester_name
      FROM tickets t
@@ -82,33 +82,14 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">Willkommen zurück, {session.name}</p>
-      </div>
+      {/* Area-aware header + stats */}
+      <DashboardHeader name={session.name} stats={stats} />
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s, i) => {
-          const Icon = s.icon
-          return (
-            <div key={i} className="rounded-xl border bg-card p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{s.label}</p>
-                  <p className="text-3xl font-bold mt-1">{s.value}</p>
-                </div>
-                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${s.color}`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {/* Charts */}
+      <DashboardCharts />
 
       {/* Recent tickets */}
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-xl border bg-card">
         <div className="flex items-center justify-between p-5 pb-3">
           <h2 className="font-semibold">Aktuelle Meldungen</h2>
           <Link href="/tickets" className="text-sm text-primary hover:underline flex items-center gap-1">

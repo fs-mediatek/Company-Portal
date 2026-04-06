@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
-import { query, queryOne } from "@/lib/db"
+import { coreQuery, coreQueryOne } from "@/lib/core-db"
 import bcrypt from "bcryptjs"
 
 export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const user = await queryOne(
-    `SELECT u.id, u.name, u.email, u.role, u.phone, u.group_id, g.name as group_name, u.created_at
-     FROM users u LEFT JOIN \`groups\` g ON u.group_id = g.id
+  const user = await coreQueryOne(
+    `SELECT u.id, u.name, u.email, u.role, u.phone, u.department_id, d.display_name as department_name, u.created_at
+     FROM users u LEFT JOIN departments d ON u.department_id = d.id
      WHERE u.id = ?`,
     [session.userId]
   )
@@ -37,6 +37,6 @@ export async function PUT(req: NextRequest) {
 
   if (!updates.length) return NextResponse.json({ error: "Keine Änderungen" }, { status: 400 })
 
-  await query(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, [...vals, session.userId])
+  await coreQuery(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, [...vals, session.userId])
   return NextResponse.json({ success: true })
 }

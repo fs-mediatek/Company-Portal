@@ -13,7 +13,12 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     start(controller) {
       const proc = spawn("bash", ["/opt/deploy-portal.sh"], {
-        env: { ...process.env, PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" },
+        env: {
+          HOME: "/root",
+          USER: "root",
+          PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+          NODE_ENV: "production",
+        },
       })
 
       proc.stdout.on("data", (data: Buffer) => {

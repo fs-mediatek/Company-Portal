@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Loader2, Plus, Trash2, Save, Building2, Users, Shield, Hash, Mail, KeyRound,
   CheckCircle2, XCircle, Send, Menu, RefreshCw, Palette, Inbox, TicketCheck, MessageCircle,
+  GitBranch, Play,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type Tab = "company" | "branding" | "smtp" | "mailpoller" | "microsoft" | "sync" | "tickets" | "departments" | "roles" | "numbering" | "navigation"
+type Tab = "company" | "branding" | "smtp" | "mailpoller" | "microsoft" | "sync" | "tickets" | "departments" | "roles" | "numbering" | "navigation" | "deploy"
 
 export function SettingsClient({ initialSettings }: { initialSettings: Record<string, string> }) {
   const [tab, setTab] = useState<Tab>("company")
@@ -32,6 +33,9 @@ export function SettingsClient({ initialSettings }: { initialSettings: Record<st
 
   const [showDeptDialog, setShowDeptDialog] = useState(false)
   const [deptForm, setDeptForm] = useState({ name: "", display_name: "", parent_id: "" })
+
+  const [deployLog, setDeployLog] = useState<string>("")
+  const [deploying, setDeploying] = useState(false)
 
   useEffect(() => {
     fetch("/api/roles").then(r => r.json()).then(d => setRoles(Array.isArray(d) ? d : [])).catch(() => {})
@@ -80,6 +84,25 @@ export function SettingsClient({ initialSettings }: { initialSettings: Record<st
     setSettings(s => ({ ...s, [key]: value }))
   }
 
+  async function startDeploy() {
+    setDeploying(true)
+    setDeployLog("")
+    try {
+      const res = await fetch("/api/admin/deploy", { method: "POST" })
+      if (!res.body) throw new Error("Kein Stream")
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        setDeployLog(prev => prev + decoder.decode(value))
+      }
+    } catch (e: any) {
+      setDeployLog(prev => prev + `\n[Fehler] ${e.message}`)
+    }
+    setDeploying(false)
+  }
+
   const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: "company", label: "Unternehmen", icon: Building2 },
     { key: "branding", label: "Branding", icon: Palette },
@@ -92,6 +115,7 @@ export function SettingsClient({ initialSettings }: { initialSettings: Record<st
     { key: "roles", label: "Rollen", icon: Shield },
     { key: "numbering", label: "Nummerierung", icon: Hash },
     { key: "navigation", label: "Navigation", icon: Menu },
+    { key: "deploy", label: "Updates", icon: GitBranch },
   ]
 
   return (
@@ -503,6 +527,32 @@ export function SettingsClient({ initialSettings }: { initialSettings: Record<st
                 setNavSaving(false)
               }}
             />
+          )}
+
+          {/* ── Updates / Deploy ── */}
+          {tab === "deploy" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <GitBranch className="h-4 w-4" />
+                  Updates einspielen
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Zieht den aktuellen Stand aus dem GitHub-Repository, baut die Anwendung neu und startet sie.
+                </p>
+                <Button onClick={startDeploy} disabled={deploying} className="gap-2">
+                  {deploying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  {deploying ? "Wird deployed…" : "Deploy starten"}
+                </Button>
+                {(deployLog || deploying) && (
+                  <pre className="mt-2 max-h-96 overflow-auto rounded-md bg-black p-4 text-xs text-green-400 whitespace-pre-wrap font-mono">
+                    {deployLog || "Starte…"}
+                  </pre>
+                )}
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>

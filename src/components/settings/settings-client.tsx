@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Loader2, Plus, Trash2, Save, Building2, Users, Shield, Hash, Mail, KeyRound,
   CheckCircle2, XCircle, Send, Menu, RefreshCw, Palette, Inbox, TicketCheck, MessageCircle,
-  GitBranch, Play,
+  GitBranch, Play, FolderOpen, Link2, Unlink,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -36,6 +36,13 @@ export function SettingsClient({ initialSettings }: { initialSettings: Record<st
 
   const [deployLog, setDeployLog] = useState<string>("")
   const [deploying, setDeploying] = useState(false)
+
+  const [spSites, setSpSites] = useState<any[]>([])
+  const [spLoading, setSpLoading] = useState(false)
+  const [spForm, setSpForm] = useState({ name: "", site_url: "", drive_name: "Dokumente", base_folder: "", description: "" })
+  const [spAdding, setSpAdding] = useState(false)
+  const [spTestResults, setSpTestResults] = useState<Record<number, { ok: boolean; message: string }>>({})
+  const [spTesting, setSpTesting] = useState<number | null>(null)
 
   useEffect(() => {
     fetch("/api/roles").then(r => r.json()).then(d => setRoles(Array.isArray(d) ? d : [])).catch(() => {})
@@ -115,6 +122,7 @@ export function SettingsClient({ initialSettings }: { initialSettings: Record<st
     { key: "roles", label: "Rollen", icon: Shield },
     { key: "numbering", label: "Nummerierung", icon: Hash },
     { key: "navigation", label: "Navigation", icon: Menu },
+    { key: "sharepoint", label: "SharePoint", icon: FolderOpen },
     { key: "deploy", label: "Updates", icon: GitBranch },
   ]
 
@@ -529,6 +537,24 @@ export function SettingsClient({ initialSettings }: { initialSettings: Record<st
             />
           )}
 
+          {/* ── SharePoint ── */}
+          {tab === "sharepoint" && (
+            <SharePointTab
+              sites={spSites}
+              setSites={setSpSites}
+              loading={spLoading}
+              setLoading={setSpLoading}
+              form={spForm}
+              setForm={setSpForm}
+              adding={spAdding}
+              setAdding={setSpAdding}
+              testResults={spTestResults}
+              setTestResults={setSpTestResults}
+              testing={spTesting}
+              setTesting={setSpTesting}
+            />
+          )}
+
           {/* ── Updates / Deploy ── */}
           {tab === "deploy" && (
             <Card>
@@ -627,6 +653,95 @@ const ALL_NAV_ITEMS = [
     { key: "settings", label: "Einstellungen" },
   ]},
 ]
+
+function SharePointTab({ sites, setSites, loading, setLoading, form, setForm, adding, setAdding, testResults, setTestResults, testing, setTesting }: any) {
+  useEffect(() => {
+    setLoading(true)
+    fetch("/api/sharepoint/sites").then(r => r.json()).then(d => setSites(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  async function addSite(e: React.FormEvent) {
+    e.preventDefault()
+    setAdding(true)
+    const res = await fetch("/api/sharepoint/sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) })
+    if (res.ok) {
+      setForm({ name: "", site_url: "", drive_name: "Dokumente", base_folder: "", description: "" })
+      const updated = await fetch("/api/sharepoint/sites").then(r => r.json())
+      setSites(Array.isArray(updated) ? updated : [])
+    }
+    setAdding(false)
+  }
+
+  async function deleteSite(id: number) {
+    await fetch(`/api/sharepoint/sites/${id}`, { method: "DELETE" })
+    setSites((s: any[]) => s.filter(x => x.id !== id))
+  }
+
+  async function testSite(id: number) {
+    setTesting(id)
+    const res = await fetch(`/api/sharepoint/sites/${id}`, { method: "POST" })
+    const data = await res.json()
+    setTestResults((r: any) => ({ ...r, [id]: data }))
+    setTesting(null)
+  }
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><FolderOpen className="h-4 w-4" />SharePoint-Sites</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">Verwalte SharePoint-Sites für die Dokumentenablage. Jedes Fahrzeug kann einer Site zugewiesen werden.</p>
+          {loading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : sites.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Sites konfiguriert.</p>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {sites.map((site: any) => (
+                <div key={site.id} className="py-3 flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{site.name}</span>
+                      {!site.active && <Badge variant="secondary">Inaktiv</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{site.site_url}</p>
+                    <p className="text-xs text-muted-foreground">Library: {site.drive_name}{site.base_folder ? ` · Ordner: ${site.base_folder}` : ""}</p>
+                    {testResults[site.id] && (
+                      <p className={`text-xs mt-1 ${testResults[site.id].ok ? "text-emerald-600" : "text-red-600"}`}>{testResults[site.id].message}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => testSite(site.id)} disabled={testing === site.id} className="gap-1">
+                      {testing === site.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                      Testen
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => deleteSite(site.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Neue Site hinzufügen</CardTitle></CardHeader>
+        <CardContent>
+          <form onSubmit={addSite} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Name</Label><Input value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} required placeholder="z.B. ÜAG SharePoint" /></div>
+              <div className="space-y-1.5"><Label>Site-URL</Label><Input value={form.site_url} onChange={e => setForm((f: any) => ({ ...f, site_url: e.target.value }))} required placeholder="https://contoso.sharepoint.com/sites/..." /></div>
+              <div className="space-y-1.5"><Label>Document Library</Label><Input value={form.drive_name} onChange={e => setForm((f: any) => ({ ...f, drive_name: e.target.value }))} placeholder="Dokumente" /></div>
+              <div className="space-y-1.5"><Label>Basis-Ordner (optional)</Label><Input value={form.base_folder} onChange={e => setForm((f: any) => ({ ...f, base_folder: e.target.value }))} placeholder="z.B. Fuhrpark" /></div>
+            </div>
+            <div className="space-y-1.5"><Label>Beschreibung (optional)</Label><Input value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} placeholder="Optionale Beschreibung" /></div>
+            <Button type="submit" disabled={adding} className="gap-2">{adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Site hinzufügen</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
 function SyncTab() {
   const [entraStatus, setEntraStatus] = useState<any>(null)

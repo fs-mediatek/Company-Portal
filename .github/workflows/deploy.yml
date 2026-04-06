@@ -35,7 +35,7 @@ jobs:
       # Standalone output: copy static assets into the standalone bundle
       - name: Assemble standalone bundle
         run: |
-          cp -r .next/static .next/standalone/.next/static
+          rm -rf .next/standalone/.next/static && cp -r .next/static .next/standalone/.next/static
           [ -d public ] && cp -r public .next/standalone/public || echo "No public/ dir, skipping"
 
       - name: Deploy to /var/www/company-portal

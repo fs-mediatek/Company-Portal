@@ -10,7 +10,12 @@ export async function GET(req: NextRequest, { params }: Ctx) {
 
   const { id } = await params
   const vehicle = await queryOne(
-    `SELECT v.*, u.name as assigned_to_name, l.name as location_name
+    `SELECT v.*,
+       u.name as assigned_to_name,
+       l.name as location_name,
+       DATEDIFF(v.next_tuv, CURDATE()) as days_to_tuv,
+       DATEDIFF(v.lease_end_date, CURDATE()) as days_to_lease_end,
+       DATEDIFF(v.insurance_until, CURDATE()) as days_to_insurance_end
      FROM vehicles v
      LEFT JOIN users u ON v.assigned_to_user_id = u.id
      LEFT JOIN locations l ON v.location_id = l.id
@@ -34,8 +39,13 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   const allowed = [
     "license_plate", "make", "model", "type", "year", "color", "vin", "status",
-    "assigned_to_user_id", "location_id", "mileage", "fuel_type",
-    "next_inspection", "next_tuv", "insurance_until", "notes", "active",
+    "assigned_to_user_id", "location_id", "mileage", "fuel_type", "transmission",
+    "tire_type", "tire_size", "first_registration", "ownership_type",
+    "lease_end_date", "lease_end_km", "lease_amount", "vehicle_tax", "purchase_price",
+    "insurer", "insurance_number", "insurance_amount", "payment_period",
+    "next_inspection", "next_tuv", "insurance_until",
+    "contact_person", "contact_email", "contact_phone",
+    "cost_center", "company", "notes", "active", "photo_path",
   ]
   const updates = Object.entries(body).filter(([k]) => allowed.includes(k))
   if (!updates.length) return NextResponse.json({ error: "Keine Felder" }, { status: 400 })
@@ -55,6 +65,6 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
   if (!isPrivileged) return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 })
 
   const { id } = await params
-  await query('UPDATE vehicles SET active = 0 WHERE id = ?', [id])
+  await query("UPDATE vehicles SET active = 0 WHERE id = ?", [id])
   return NextResponse.json({ success: true })
 }

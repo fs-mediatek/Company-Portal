@@ -10,8 +10,9 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to 10.0.40.71 (CT 108)
-    runs-on: ubuntu-latest
+    # Self-hosted runner on 10.0.40.71 — builds and deploys locally, no SSH needed
+    name: Deploy on CT 108 (self-hosted)
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
@@ -20,8 +21,8 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -31,55 +32,29 @@ jobs:
         env:
           NODE_ENV: production
 
-      # Standalone output structure after build:
-      #   .next/standalone/          ← self-contained server (node server.js)
-      #   .next/standalone/.next/    ← server-side chunks
-      #   .next/static/              ← must be copied → standalone/.next/static/
-      #   public/                    ← must be copied → standalone/public/
+      # Standalone output: copy static assets into the standalone bundle
       - name: Assemble standalone bundle
         run: |
           cp -r .next/static .next/standalone/.next/static
           [ -d public ] && cp -r public .next/standalone/public || echo "No public/ dir, skipping"
 
-      - name: Transfer standalone bundle to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: root
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          source: '.next/standalone/'
-          target: /var/www/company-portal
-          strip_components: 2
+      - name: Deploy to /var/www/company-portal
+        run: |
+          APP_DIR=/var/www/company-portal
+          mkdir -p "$APP_DIR"
 
-      - name: Transfer deploy scripts and PM2 config to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: root
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          source: "scripts/,ecosystem.config.cjs"
-          target: /var/www/company-portal
-          strip_components: 0
+          # Sync standalone bundle (built on this runner = this server)
+          rsync -a --delete .next/standalone/ "$APP_DIR/"
 
-      - name: Reload application via PM2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: root
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            bash /var/www/company-portal/scripts/deploy.sh
+          # Keep ecosystem config and scripts up to date
+          cp ecosystem.config.cjs "$APP_DIR/ecosystem.config.cjs"
+          cp -r scripts "$APP_DIR/scripts"
+          chmod +x "$APP_DIR/scripts/"*.sh
+
+          # Reload or start PM2
+          bash "$APP_DIR/scripts/deploy.sh"
 
       - name: Verify deployment
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: root
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            pm2 status company-portal
-            curl -sf http://localhost:3000/ > /dev/null && echo "Health check: OK" || echo "Health check: FAILED"
+        run: |
+          pm2 status company-portal
+          curl -sf http://localhost:3000/ > /dev/null && echo "Health check: OK" || echo "Health check: FAILED"

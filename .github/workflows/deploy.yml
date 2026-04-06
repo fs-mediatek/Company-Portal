@@ -43,11 +43,17 @@ jobs:
           APP_DIR=/var/www/company-portal
           mkdir -p "$APP_DIR"
 
+          echo "[diag] whoami: $(whoami)"
+          echo "[diag] ls /var/www/: $(ls /var/www/ 2>&1)"
+          echo "[diag] .env.local before rsync: $(ls -la $APP_DIR/.env.local 2>&1)"
+
           # Sync standalone bundle — exclude server-side config files from deletion
           rsync -a --delete \
             --exclude='.env.local' \
             --exclude='.env' \
             .next/standalone/ "$APP_DIR/"
+
+          echo "[diag] .env.local after rsync: $(ls -la $APP_DIR/.env.local 2>&1)"
 
           # Keep ecosystem config and scripts up to date
           cp ecosystem.config.cjs "$APP_DIR/ecosystem.config.cjs"

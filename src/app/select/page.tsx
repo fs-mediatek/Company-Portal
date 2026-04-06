@@ -95,7 +95,7 @@ export default function SelectPage() {
   function selectArea(areaKey: string) {
     localStorage.setItem("active_area", areaKey)
     if (areaKey === "helpdesk") router.push("/helpdesk/dashboard")
-    else if (areaKey === "traincore") router.push("/traincore/dashboard")
+    else if (areaKey === "traincore") router.push("/schulungen")
     else router.push("/dashboard")
   }
 

@@ -37,9 +37,9 @@ const fleetNav: NavItem[] = [
 ]
 
 const traincoreNav: NavItem[] = [
-  { key: "tc-dashboard", href: "/traincore/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "tc-modules", href: "/traincore/modules", label: "Schulungsmodule", icon: BookOpen },
-  { key: "tc-reports", href: "/traincore/reports", label: "Berichte", icon: ClipboardCheck },
+  { key: "tc-dashboard", href: "/schulungen", label: "Dashboard", icon: LayoutDashboard },
+  { key: "tc-modules", href: "/schulungen/modules", label: "Schulungsmodule", icon: BookOpen },
+  { key: "tc-reports", href: "/schulungen/reports", label: "Berichte", icon: ClipboardCheck },
   { key: "tc-users", href: "/users", label: "Benutzer", icon: Users, requiredRoles: ["admin", "manager"] },
   { key: "tc-settings", href: "/settings", label: "Einstellungen", icon: Settings, requiredRoles: ["admin"] },
 ]

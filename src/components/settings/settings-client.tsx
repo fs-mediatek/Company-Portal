@@ -647,6 +647,7 @@ const ALL_NAV_ITEMS = [
     { key: "tc-dashboard", label: "Dashboard" },
     { key: "tc-modules", label: "Schulungsmodule" },
     { key: "tc-reports", label: "Berichte" },
+    { key: "tc-users", label: "Benutzer" },
   ]},
   { section: "Übergreifend", items: [
     { key: "users", label: "Benutzer" },

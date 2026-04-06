@@ -46,8 +46,6 @@ jobs:
           mkdir -p "$APP_DIR"
 
           echo "[diag] whoami: $(whoami)"
-          echo "[diag] pm2 location: $(find /usr /root /home -name pm2 -type f 2>/dev/null | head -3)"
-          echo "[diag] PATH: $PATH"
           echo "[diag] .env.local before rsync: $(ls -la $APP_DIR/.env.local 2>&1)"
 
           # Sync standalone bundle — exclude server-side config files from deletion
@@ -63,13 +61,11 @@ jobs:
           cp -r scripts "$APP_DIR/scripts"
           chmod +x "$APP_DIR/scripts/"*.sh
 
-          # Ensure pm2 is on PATH regardless of install location
-          PM2_BIN=$(find /usr /root /home -name pm2 -type f 2>/dev/null | head -1)
-          if [ -n "$PM2_BIN" ]; then
-            export PATH="$(dirname "$PM2_BIN"):$PATH"
-            echo "[diag] pm2 found at: $PM2_BIN"
-          else
-            echo "[diag] WARNING: pm2 not found on filesystem"
+          # Install pm2 globally if not present
+          if ! which pm2 > /dev/null 2>&1; then
+            echo "[deploy] pm2 not found, installing..."
+            npm install -g pm2
+            pm2 startup systemd -u runner --hp /home/runner || true
           fi
 
           # Reload or start PM2
